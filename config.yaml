@@ -1,0 +1,13 @@
+apps:
+  - name: "HelloApp"
+    repo: "https://github.com/kellensoft/hello.git"
+    env:
+      PORT: "3000"
+      FAILURE_MESSAGE: "Sorry, no response."
+
+  - name: "WorldApp"
+    repo: "https://github.com/kellensoft/hello.git"
+    env:
+      PORT: "3003"
+      CALL_TARGET_URL: "http://localhost:3000"
+      MESSAGE: "World"
