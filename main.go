@@ -40,7 +40,7 @@ func main() {
 			if runtime.GOOS == "windows" {
 				app.Cmd.Process.Kill()
 			} else {
-				syscall.Kill(-app.PGID, syscall.SIGKILL)
+				killProcessGroup(app.PGID)
 			}
 			fmt.Printf("Terminated %s\n", app.Name)
 		}
@@ -86,7 +86,7 @@ func main() {
 			Cmd:  cmd,
 		}
 		if runtime.GOOS != "windows" {
-			if pgid, err := syscall.Getpgid(cmd.Process.Pid); err == nil {
+			if pgid, err := getPGID(cmd.Process.Pid); err == nil {
 				appInstance.PGID = pgid
 			}
 		}

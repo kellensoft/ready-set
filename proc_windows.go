@@ -1,4 +1,5 @@
 //go:build windows
+
 package main
 
 import (
@@ -13,4 +14,12 @@ func setupCommand(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
+}
+
+func getPGID(pid int) (int, error) {
+	return 0, nil // PGID isn't used on Windows
+}
+
+func killProcessGroup(_ int) error {
+	return nil // No-op
 }
