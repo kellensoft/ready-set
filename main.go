@@ -37,11 +37,10 @@ func main() {
 		<-sigChan
 		fmt.Println("\n🔻 Shutting down all apps...")
 		for _, app := range runningApps {
-			if runtime.GOOS == "windows" {
-				app.Cmd.Process.Kill()
-			} else {
-				killProcessGroup(app.PGID)
+			if app.Cmd.Process != nil {
+				_ = app.Cmd.Process.Kill()
 			}
+			_ = killProcessGroup(app.PGID)
 			fmt.Printf("Terminated %s\n", app.Name)
 		}
 		os.Exit(0)

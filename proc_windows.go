@@ -16,7 +16,7 @@ func setupCommand(cmd *exec.Cmd) {
 	}
 }
 
-func getPGID(pid int) (int, error) {
+func getPGID(_ int) (int, error) {
 	return 0, nil // PGID isn't used on Windows
 }
 
