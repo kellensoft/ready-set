@@ -20,3 +20,7 @@ func getPGID(pid int) (int, error) {
 func killProcessGroup(pgid int) error {
 	return syscall.Kill(-pgid, syscall.SIGKILL)
 }
+
+func getCommand(command string) *exec.Cmd {
+	return exec.Command("sh", "-c", command)
+}

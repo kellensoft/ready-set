@@ -4,7 +4,8 @@ package main
 
 import (
 	"os/exec"
-
+	"strconv"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows"
@@ -16,10 +17,15 @@ func setupCommand(cmd *exec.Cmd) {
 	}
 }
 
-func getPGID(_ int) (int, error) {
-	return 0, nil // PGID isn't used on Windows
+func getPGID(pid int) (int, error) {
+	return pid, nil
 }
 
-func killProcessGroup(_ int) error {
-	return nil // No-op
+func killProcessGroup(pid int) error {
+	return exec.Command("taskkill", "/PID", strconv.Itoa(pid), "/T", "/F").Run()
+}
+
+func getCommand(command string) *exec.Cmd {
+	parts := strings.Fields(command)
+	return exec.Command(parts[0], parts[1:]...)
 }

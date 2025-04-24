@@ -37,20 +37,18 @@ func main() {
 		<-sigChan
 		fmt.Println("\n🔻 Shutting down all apps...")
 		for _, app := range runningApps {
-			if app.Cmd.Process != nil {
+			if app.Cmd != nil && app.Cmd.Process != nil {
 				_ = app.Cmd.Process.Kill()
+				_ = killProcessGroup(app.PGID)
+				fmt.Printf("Terminated %s\n", app.Name)
 			}
-			_ = killProcessGroup(app.PGID)
-			fmt.Printf("Terminated %s\n", app.Name)
 		}
 		os.Exit(0)
 	}()
 
 	for _, app := range config.Apps {
 		appDir := filepath.Join("apps", app.Name)
-		indexPath := filepath.Join(appDir, "index.js")
-
-		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+		if _, err := os.Stat(appDir); os.IsNotExist(err) {
 			fmt.Printf("Cloning %s into %s...\n", app.Repo, appDir)
 			cmd := exec.Command("git", "clone", app.Repo, appDir)
 			cmd.Stdout = os.Stdout
@@ -66,26 +64,54 @@ func main() {
 			env = append(env, fmt.Sprintf("%s=%s", k, v))
 		}
 
-		cmd := exec.Command("node", "index.js")
-		cmd.Dir = appDir
-		cmd.Env = env
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		setupCommand(cmd)
+		steps := []struct {
+			name string
+			cmd  string
+		}{
+			{"build", app.Commands["build"]},
+			{"test", app.Commands["test"]},
+			{"start", app.Commands["start"]},
+		}
 
-		if err := cmd.Start(); err != nil {
-			fmt.Printf("Failed to start %s: %v\n", app.Name, err)
+		var startCmd *exec.Cmd
+		for _, step := range steps {
+			if step.cmd == "" {
+				continue
+			}
+			fmt.Printf("Running %s command for %s...\n", step.name, app.Name)
+
+			cmd := getCommand(step.cmd)
+			cmd.Dir = appDir
+			cmd.Env = env
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			setupCommand(cmd)
+
+			if err := cmd.Start(); err != nil {
+				fmt.Printf("Failed to start %s: %v\n", app.Name, err)
+				break
+			}
+
+			if step.name == "start" {
+				startCmd = cmd
+			} else {
+				_ = cmd.Wait()
+			}
+		}
+
+		if startCmd == nil {
+			fmt.Printf("No start command for %s, skipping\n", app.Name)
 			continue
 		}
 
-		fmt.Printf("%s is running (PID %d)\n", app.Name, cmd.Process.Pid)
+		fmt.Printf("%s is running (PID %d)\n", app.Name, startCmd.Process.Pid)
 
 		appInstance := RunningApp{
 			Name: app.Name,
-			Cmd:  cmd,
+			Cmd:  startCmd,
 		}
 		if runtime.GOOS != "windows" {
-			if pgid, err := getPGID(cmd.Process.Pid); err == nil {
+			if pgid, err := getPGID(startCmd.Process.Pid); err == nil {
 				appInstance.PGID = pgid
 			}
 		}
