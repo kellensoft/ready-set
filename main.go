@@ -1,19 +1,24 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 )
 
 type RunningApp struct {
-	Name string
-	Cmd  *exec.Cmd
-	PGID int
+	Name      string
+	Cmd       *exec.Cmd
+	PGID      int
+	StartedAt time.Time
+	StoppedAt *time.Time
 }
 
 var runningApps []RunningApp
@@ -107,8 +112,9 @@ func main() {
 		fmt.Printf("%s is running (PID %d)\n", app.Name, startCmd.Process.Pid)
 
 		appInstance := RunningApp{
-			Name: app.Name,
-			Cmd:  startCmd,
+			Name:      app.Name,
+			Cmd:       startCmd,
+			StartedAt: time.Now(),
 		}
 		if runtime.GOOS != "windows" {
 			if pgid, err := getPGID(startCmd.Process.Pid); err == nil {
@@ -118,5 +124,42 @@ func main() {
 		runningApps = append(runningApps, appInstance)
 	}
 
+	go startWebService()
 	select {}
+}
+
+func startWebService() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		type AppStatus struct {
+			Name          string     `json:"name"`
+			Running       bool       `json:"running"`
+			StartedAt     time.Time  `json:"started_at"`
+			StoppedAt     *time.Time `json:"stopped_at,omitempty"`
+			UptimeSeconds int64      `json:"uptime_seconds"`
+		}
+
+		var status []AppStatus
+		now := time.Now()
+
+		for _, app := range runningApps {
+			running := app.Cmd.ProcessState == nil || !app.Cmd.ProcessState.Exited()
+			uptime := now.Sub(app.StartedAt).Seconds()
+			if app.StoppedAt != nil {
+				uptime = app.StoppedAt.Sub(app.StartedAt).Seconds()
+			}
+			status = append(status, AppStatus{
+				Name:          app.Name,
+				Running:       running,
+				StartedAt:     app.StartedAt,
+				StoppedAt:     app.StoppedAt,
+				UptimeSeconds: int64(uptime),
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(status)
+	})
+
+	fmt.Println("Ready-Set: live on 8080")
+	http.ListenAndServe(":8080", nil)
 }
